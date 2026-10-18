@@ -98,6 +98,35 @@ func TestChatTranslate_ToolResultOrderedFirst(t *testing.T) {
 	}
 }
 
+func TestChatTranslate_ToolResultImageSurvives(t *testing.T) {
+	// The shape Claude Code sends when Read opens a PNG: a tool_result whose content is
+	// an image block, not text. The image must reach the model on the user message
+	// that follows the tool message.
+	content := `[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"AAAA"}}]}]`
+	a := parseReq(t, `{"model":"m","max_tokens":10,"messages":[{"role":"user","content":`+content+`}]}`)
+	r, _ := translateChatRequest(a, newConvCtx(a, ""))
+	if len(r.Messages) != 2 {
+		t.Fatalf("messages = %d, want tool then user", len(r.Messages))
+	}
+	if tool := asMap(t, r.Messages[0]); tool["role"] != "tool" || tool["tool_call_id"] != "t1" {
+		t.Fatalf("tool msg must come first: %v", tool)
+	}
+	usr := asMap(t, r.Messages[1])
+	parts, ok := usr["content"].([]map[string]any)
+	if !ok {
+		t.Fatalf("tool-returned image must ride on a parts array: %#v", usr["content"])
+	}
+	var got string
+	for _, p := range parts {
+		if p["type"] == "image_url" {
+			got = asMap(t, p["image_url"])["url"].(string)
+		}
+	}
+	if got != "data:image/png;base64,AAAA" {
+		t.Fatalf("image part missing or wrong in %#v", parts)
+	}
+}
+
 func TestChatTranslate_ToolChoiceAndTools(t *testing.T) {
 	a := parseReq(t, `{"model":"m","max_tokens":10,"messages":[{"role":"user","content":"hi"}],
 		"tools":[{"name":"lookup","description":"d","input_schema":{"type":"object"}}],

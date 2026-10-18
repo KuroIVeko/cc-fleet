@@ -352,6 +352,26 @@ func toolResultOutput(b contentBlock) string {
 	return out
 }
 
+// toolResultImages returns the image blocks of a tool_result's []block content as
+// Chat image_url parts. toolResultText keeps text only, so this is the one place the
+// images survive. A string content or an unparsable one has none.
+func toolResultImages(raw json.RawMessage) []map[string]any {
+	var blocks []contentBlock
+	if len(raw) == 0 || json.Unmarshal(raw, &blocks) != nil {
+		return nil
+	}
+	var out []map[string]any
+	for _, b := range blocks {
+		if b.Type != "image" {
+			continue
+		}
+		if u := imageDataURL(b.Source); u != "" {
+			out = append(out, map[string]any{"type": "image_url", "image_url": map[string]any{"url": u}})
+		}
+	}
+	return out
+}
+
 // toolResultText flattens an Anthropic tool_result content (string OR []block) to
 // the plain string the Responses function_call_output carries.
 func toolResultText(raw json.RawMessage) string {
