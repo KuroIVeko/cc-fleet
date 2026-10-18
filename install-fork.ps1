@@ -80,13 +80,35 @@ try {
         Copy-Item -Path $dst -Destination $bak
         Write-Host "==> Kept the existing binary as $bak"
     }
-    try {
-        Copy-Item -Path $src -Destination $dst -Force
-        Copy-Item -Path $src -Destination (Join-Path $PREFIX 'ccf.exe') -Force
-    } catch {
-        Die "could not overwrite $dst - is cc-fleet still running (a subagent, the TUI)? Close it and retry. ($($_.Exception.Message))"
+    # Windows can't overwrite or delete a running exe, but it can rename one. So move the
+    # old file aside, then put the new one in its place: processes still running the old
+    # binary (a TUI, a `ccf run` session, the codex proxy) keep going, and the next launch
+    # uses the new one. Aside-files are swept on the next install once nothing holds them.
+    function Install-Exe($from, $to) {
+        $dir  = Split-Path $to
+        $leaf = Split-Path $to -Leaf
+        Get-ChildItem -Path $dir -Filter "$leaf.old-*" -ErrorAction SilentlyContinue |
+            ForEach-Object { Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue }
+        $aside = $null
+        if (Test-Path $to) {
+            if ((Get-FileHash -Algorithm SHA256 -Path $to).Hash -eq (Get-FileHash -Algorithm SHA256 -Path $from).Hash) {
+                Write-Host "    $leaf already up to date"
+                return
+            }
+            $aside = "$to.old-" + (Get-Date -Format 'yyyyMMddHHmmss')
+            Rename-Item -Path $to -NewName (Split-Path $aside -Leaf) -ErrorAction Stop
+        }
+        try {
+            Copy-Item -Path $from -Destination $to -ErrorAction Stop
+        } catch {
+            if ($aside) { Rename-Item -Path $aside -NewName $leaf -ErrorAction SilentlyContinue }
+            Die "could not install $to ($($_.Exception.Message))"
+        }
     }
+    Install-Exe $src $dst
+    Install-Exe $src (Join-Path $PREFIX 'ccf.exe')
     Write-Host "==> Installed $dst (+ ccf alias), build $VERSION"
+    Write-Host "    Already-running cc-fleet processes keep the old binary until restarted."
 } finally {
     Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
 }
