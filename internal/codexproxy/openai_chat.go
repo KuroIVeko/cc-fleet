@@ -236,6 +236,14 @@ func translateChatMessage(m anthropicMessage, cc *convCtx) ([]any, error) {
 			toolMsgs = append(toolMsgs, map[string]any{
 				"role": "tool", "tool_call_id": b.ToolUseID, "content": toolResultOutput(b),
 			})
+			// A Chat tool message is text-only, so an image the tool returned (Read on a
+			// PNG) rides on the user message that follows the tool results, where the
+			// model can see it. Without this the image was dropped silently.
+			if imgs := toolResultImages(b.Content); len(imgs) > 0 {
+				parts = append(parts, map[string]any{"type": "text", "text": "(image returned by the tool above)"})
+				parts = append(parts, imgs...)
+				hasImage = true
+			}
 		case "thinking":
 			// The stream converter turned the model's reasoning_content into this block.
 			// Thinking-mode models such as deepseek-v4-pro reject a follow-up turn whose
