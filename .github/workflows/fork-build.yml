@@ -1,0 +1,48 @@
+name: fork-build
+
+# Builds the Windows binaries of this fork and publishes them as a GitHub Release,
+# so `install-fork.ps1` can install them. Separate from upstream's release.yml (which
+# needs the upstream signing key and only fires on `v*` tags): this one fires on
+# `fork-<upstream version>-<suffix>` tags, e.g. fork-0.4.2-ps1, which never match `v*`.
+
+on:
+  push:
+    tags:
+      - "fork-*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build windows archives
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          # fork-0.4.2-ps1 -> 0.4.2: the binary reports the upstream version it is based on.
+          ver="${TAG#fork-}"
+          ver="${ver%%-*}"
+          for arch in amd64 arm64; do
+            d="cc-fleet-windows-${arch}"
+            mkdir -p "$d"
+            CGO_ENABLED=0 GOOS=windows GOARCH="$arch" go build -buildvcs=false -trimpath \
+              -ldflags "-s -w -X github.com/ethanhq/cc-fleet/internal/version.Version=${ver}" \
+              -o "$d/cc-fleet.exe" ./cmd/cc-fleet
+            zip -qr "${d}.zip" "$d"
+          done
+          sha256sum cc-fleet-windows-*.zip > checksums.txt
+          cat checksums.txt
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" cc-fleet-windows-*.zip checksums.txt \
+            --title "$TAG" \
+            --notes "Fork build of cc-fleet (Windows). Adds PowerShell to the slim tool whitelist. See FORK.md."
