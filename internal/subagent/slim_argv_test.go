@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
@@ -241,7 +242,8 @@ func TestBuildSlimArgv(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := []string{"Bash", "Edit", "Glob", "Grep", "Read", "Skill", "Write"} // canonicalized (sorted)
+		want := append(shellTools(runtime.GOOS), "Edit", "Glob", "Grep", "Read", "Skill", "Write")
+		sort.Strings(want) // canonicalized (sorted)
 		if !reflect.DeepEqual(sa.tools, want) {
 			t.Fatalf("slim default tools = %v, want %v", sa.tools, want)
 		}
@@ -272,7 +274,8 @@ func TestBuildSlimArgv(t *testing.T) {
 				t.Fatalf("NoSkills slim-ro must drop Skill: %v", sa.tools)
 			}
 		}
-		want := []string{"Bash", "Glob", "Grep", "Read"}
+		want := append(shellTools(runtime.GOOS), "Glob", "Grep", "Read")
+		sort.Strings(want)
 		if !reflect.DeepEqual(sa.tools, want) {
 			t.Fatalf("slim-ro NoSkills tools = %v, want %v", sa.tools, want)
 		}

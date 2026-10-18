@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -23,16 +24,29 @@ func TestSlimValidateProfile(t *testing.T) {
 	}
 }
 
+func TestShellTools(t *testing.T) {
+	if got, want := shellTools("windows"), []string{"Bash", "PowerShell"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("shellTools(windows) = %v, want %v", got, want)
+	}
+	for _, goos := range []string{"linux", "darwin"} {
+		if got, want := shellTools(goos), []string{"Bash"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("shellTools(%s) = %v, want %v", goos, got, want)
+		}
+	}
+}
+
 func TestSlimDefaultTools(t *testing.T) {
+	sh := shellTools(runtime.GOOS)
+	with := func(rest ...string) []string { return append(append([]string{}, sh...), rest...) }
 	cases := []struct {
 		profile  string
 		noSkills bool
 		want     []string
 	}{
-		{ProfileSlim, false, []string{"Bash", "Read", "Edit", "Write", "Grep", "Glob", "Skill"}},
-		{ProfileSlim, true, []string{"Bash", "Read", "Edit", "Write", "Grep", "Glob"}},
-		{ProfileSlimRO, false, []string{"Bash", "Read", "Grep", "Glob", "Skill"}},
-		{ProfileSlimRO, true, []string{"Bash", "Read", "Grep", "Glob"}},
+		{ProfileSlim, false, with("Read", "Edit", "Write", "Grep", "Glob", "Skill")},
+		{ProfileSlim, true, with("Read", "Edit", "Write", "Grep", "Glob")},
+		{ProfileSlimRO, false, with("Read", "Grep", "Glob", "Skill")},
+		{ProfileSlimRO, true, with("Read", "Grep", "Glob")},
 	}
 	for _, c := range cases {
 		got := DefaultSlimTools(c.profile, c.noSkills)
