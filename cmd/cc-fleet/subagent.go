@@ -75,8 +75,8 @@ emits one machine-readable subagent.Result envelope the skill switches on.
 
 slim is the DEFAULT: a native-mirror agent prompt + a restricted tool whitelist (Bash,
 Edit, Glob, Grep, Read, Skill, Write; slim-ro is read-only: Bash, Glob, Grep, Read,
-Skill). Any tool beyond the whitelist (e.g. WebSearch) must be passed explicitly via
---tools — a whole-set replacement, not an append. --profile full restores the full
+Skill; on Windows PowerShell is added next to Bash). Any tool beyond the whitelist
+(e.g. WebSearch) must be passed explicitly via --tools — a whole-set replacement, not an append. --profile full restores the full
 session prompt (for behavior comparison). --skills / --mcp refine a slim run; slim
 inherits the host MCP config by default, slim-ro stays strict.
 

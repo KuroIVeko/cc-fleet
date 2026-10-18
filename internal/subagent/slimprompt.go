@@ -183,6 +183,7 @@ var canonicalTools = map[string]struct{}{
 	"Glob":            {},
 	"Grep":            {},
 	"NotebookEdit":    {},
+	"PowerShell":      {}, // Windows-only; see shellTools
 	"Read":            {},
 	"Skill":           {},
 	"TodoWrite":       {},
@@ -191,18 +192,29 @@ var canonicalTools = map[string]struct{}{
 	"Write":           {},
 }
 
+// shellTools is the shell tool(s) a slim profile asks claude for on goos. On
+// Windows a headless `claude -p` may expose PowerShell instead of Bash, and claude
+// silently drops a --tools name it does not have, so asking for both lets
+// whichever exists through. Elsewhere it is Bash alone.
+func shellTools(goos string) []string {
+	if goos == "windows" {
+		return []string{"Bash", "PowerShell"}
+	}
+	return []string{"Bash"}
+}
+
 // DefaultSlimTools returns a profile's default tool set: slim is read-write
 // (Bash,Read,Edit,Write,Grep,Glob), slim-ro is read-only (Bash,Read,Grep,Glob);
 // each adds Skill unless noSkills. Bash is present in slim-ro exactly as in
 // native Explore — read-only is a prompt-level contract, not sandbox
 // enforcement.
 func DefaultSlimTools(profile string, noSkills bool) []string {
-	var tools []string
+	tools := shellTools(runtime.GOOS)
 	switch profile {
 	case ProfileSlimRO:
-		tools = []string{"Bash", "Read", "Grep", "Glob"}
+		tools = append(tools, "Read", "Grep", "Glob")
 	default:
-		tools = []string{"Bash", "Read", "Edit", "Write", "Grep", "Glob"}
+		tools = append(tools, "Read", "Edit", "Write", "Grep", "Glob")
 	}
 	if !noSkills {
 		tools = append(tools, "Skill")
